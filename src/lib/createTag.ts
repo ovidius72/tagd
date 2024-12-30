@@ -6,8 +6,9 @@ import {
   NodeTypeMap,
   RenderFn,
   TagStoreType,
+  TagValues,
 } from "./types";
-import { assignAttributes, buildAttributes, isElement } from "./utils";
+import { buildAttributes, isElement } from "./utils";
 
 const createTagNodeOrText = (value: TagValues, el?: string) => {
   if (el) {
@@ -35,7 +36,7 @@ const buildTag = <T extends Record<string, unknown> | string>(
     const { tag, options = {}, attributes } = args || {};
     const { keyMap, model } = options;
     const el = tag && isElement(tag) ? tag : createTagNodeOrText(value, tag);
-    buildAttributes({ attributes  }, el);
+    buildAttributes({ attributes }, el);
     const elMap: TagStoreType<T> = {
       el,
       keyMap,
@@ -84,7 +85,7 @@ const createTagElement: RenderFn = (el, attributes, ...renderers) => {
     return el;
   }
   const tag = document.createElement(el);
-  assignAttributes(tag, attributes);
+  buildAttributes({ attributes }, tag);
   if (!Array.isArray(renderers) && typeof renderers === "string") {
     tag.innerHTML = renderers;
   }

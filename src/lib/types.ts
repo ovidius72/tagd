@@ -18,16 +18,16 @@ type MyEvent = {
   ) => void;
 };
 export type RenderAttributes =
-  null
+  | null
   | undefined
   | MyEvent
   | HTMLElement
-  | Record<string, unknown>
+  | (Record<string, unknown> & { styles?: Partial<CSSStyleDeclaration> });
 // | Record<string, string | ((event: Event, el: HTMLElement) => void)>;
 
 export type RenderFn = (
   el: string | HTMLElement,
-  props: RenderAttributes, // Record<string, unknown> | undefined | null,
+  properties: RenderAttributes, // Record<string, unknown> | undefined | null,
   ...htmlElement: Array<RenderNode>
 ) => HTMLElement;
 
@@ -57,7 +57,7 @@ export type TagBuilderOptions<T> = {
 export type BuilderArgs<T> = {
   tag: string;
   options?: TagBuilderOptions<T>;
-  attributes?: RenderAttributes,
+  attributes?: RenderAttributes;
 };
 
 export type TagStoreType<T> = {

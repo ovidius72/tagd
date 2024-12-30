@@ -22,16 +22,18 @@ import "./style.css";
 
 // setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
 
-const [builder, getter, setter] = buildTag("Initial value new");
+const [builder, _getter, setter] = buildTag("Initial value new");
 
-const Input = builder({ tag: "input", options: { model: "value" }, attributes: {
-  onInput(e) {
-    const { value } = e.target as any;
-    console.log("****:value",value)
-    setter(value);
-  }
-} });
-console.log("****:Input", Input);
+const Input = builder({
+  tag: "input",
+  options: { model: "value" },
+  attributes: {
+    onInput(e) {
+      const { value } = e.target as any;
+      setter(value);
+    },
+  },
+});
 
 // createEffect(() => {
 //   const newVal = getter();
@@ -47,12 +49,16 @@ const html = createTagElement(
   createTagElement(
     "ul",
     null,
-    createTagElement("li", { style: "background-color: red;" }, "due-uno"),
+    createTagElement(
+      "li",
+      { id: "11", styles: { backgroundColor: "red" }, className: "className" },
+      "due-uno",
+    ),
     createTagElement(
       "li",
       {
         ariaLabel: "test",
-        class: "inner",
+        className: "inner",
       },
       // createTagElement("input", {
       //   value: "init",
@@ -67,12 +73,18 @@ const html = createTagElement(
       // }),
       Input,
       builder("span"),
-      builder({'tag': 'p', attributes: {
-        style: 'background-color: peachpuff; color: violet; padding: 2rem; font-size: 22px'
-      }})
+      builder({
+        tag: "p",
+        attributes: {
+          styles: {
+            backgroundColor: "peachpuff",
+            padding: "18px",
+            borderRadius: "6px",
+          },
+        },
+      }),
     ),
   ),
 );
 
-console.log("****:html", html);
 createRoot("#app", html);
