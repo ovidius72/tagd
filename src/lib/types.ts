@@ -1,11 +1,17 @@
 export type RenderProps = HTMLElement;
 
 export type TagType = string | Node | HTMLElement;
+export type TagValues =
+  | Record<string, unknown>
+  | string
+  | number
+  | boolean
+  | undefined
+  | null;
 
 export type RenderNode =
   | Node
   | HTMLElement
-  | Text
   | string
   | number
   | undefined
@@ -23,11 +29,10 @@ export type RenderAttributes =
   | MyEvent
   | HTMLElement
   | (Record<string, unknown> & { styles?: Partial<CSSStyleDeclaration> });
-// | Record<string, string | ((event: Event, el: HTMLElement) => void)>;
 
 export type RenderFn = (
   el: string | HTMLElement,
-  properties: RenderAttributes, // Record<string, unknown> | undefined | null,
+  properties: RenderAttributes,
   ...htmlElement: Array<RenderNode>
 ) => HTMLElement;
 
@@ -35,8 +40,6 @@ export type RenderData = {
   el?: string;
   attributes: Partial<RenderAttributes>;
 };
-
-export type TagValues = any;
 
 export enum NodeTypeMap {
   "Element" = 1,
@@ -50,24 +53,69 @@ export enum NodeTypeMap {
   "Notation" = 12,
 }
 
-export type TagBuilderOptions<T> = {
+export type TagBuilderOptions<T extends TagValues> = {
   model?: string;
   keyMap?: (data: T) => string;
 };
-export type BuilderArgs<T> = {
-  tag: string;
+export type ListDefinition<T extends TagValues> = {
+  el: HTMLElement;
+  definition: ListBuilderArgs<T> & {
+    attributes?: RenderAttributes;
+    tag?: string;
+    itemsDefinition?: BuilderArgs<T>;
+  };
+};
+
+export type AfterItemCreatedHook<T extends TagValues> = (
+  el: HTMLElement,
+  value: T,
+  args: BuilderArgs<T>,
+  index: number,
+) => HTMLElement;
+
+export type ListBuilderArgs<T extends TagValues> = {
+  itemsDefinition?: BuilderArgs<T> & {
+    afterItemCreated?: AfterItemCreatedHook<T>;
+  };
+} & Omit<BuilderArgs<T>, "options">;
+
+export type BuilderArgs<T extends TagValues> = {
+  tag?: string;
   options?: TagBuilderOptions<T>;
   attributes?: RenderAttributes;
 };
 
-export type TagStoreType<T> = {
-  el: HTMLElement | Text;
-  keyMap?: (data: T) => T;
+export type TagStoreType<T extends TagValues> = {
+  el: HTMLElement;
+  keyMap?: (data: T) => T | string;
   model?: string;
 };
 
-export type BuildTagResult<T> = [
-  (data: BuilderArgs<T> | string) => HTMLElement | Text,
-  () => T,
-  (value: T) => void,
+export type Getter<T extends TagValues> = () => T;
+export type Setter<T extends TagValues> = (value: T) => void;
+
+export type CreateValueResult<T extends TagValues> = [
+  (data: BuilderArgs<T> | string) => HTMLElement,
+  handlers: { get: Getter<T>; set: Setter<T> },
 ];
+
+export type ListHandlers = {
+  // get: Getter<T>;
+  // set: Setter<T>;
+  append: (item: TagValues) => void;
+  prepend: (item: TagValues) => void;
+  // update: (index: number, item: TagValues) => TagValues;
+  insertAt: (index: number, item: TagValues) => void;
+  removeAt: (index: number) => void;
+  removeNode: (node: HTMLElement) => void;
+  clear: () => void;
+  rebuild: () => void;
+};
+
+export type CreateListValueResult<T extends TagValues> = [
+  (data: ListBuilderArgs<T> | string) => HTMLElement,
+  handlers: ListHandlers,
+];
+
+export type ArrayElement<ArrayType extends readonly TagValues[]> =
+  ArrayType extends readonly (infer ElementType)[] ? ElementType : never;

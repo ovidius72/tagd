@@ -1,4 +1,6 @@
-import { buildTag, createTagElement } from "./lib/createTag.ts";
+import { createListValues } from "./lib/createListValue.ts";
+import { createTag } from "./lib/createTag.ts";
+import { createValue } from "./lib/createValue.ts";
 import { createRoot } from "./lib/dom.ts";
 import "./style.css";
 
@@ -22,15 +24,57 @@ import "./style.css";
 
 // setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
 
-const [builder, _getter, setter] = buildTag("Initial value new");
+const [textTagFactory, textHandlers] = createValue("Initial value new");
+const [listFactory, listHandlers] = createListValues(["a", "b"]);
 
-const Input = builder({
+const LI = listFactory({
+  tag: "ol",
+  attributes: {},
+  itemsDefinition: {
+    tag: "li",
+    afterItemCreated: (el, value, args, index) => {
+      console.log("****:args", args);
+      if(index < 2) {
+        return el;
+      }
+      return createTag(
+        "li",
+        null,
+        createTag("span", null, value),
+        createTag(
+          "button",
+          {
+            onClick(e) {
+              console.log("clicked", index);
+              listHandlers.removeNode(el);
+            },
+          },
+          `Remove at ${index} value ${value}`,
+        ),
+      );
+    },
+  },
+});
+const Input = textTagFactory({
   tag: "input",
   options: { model: "value" },
   attributes: {
     onInput(e) {
       const { value } = e.target as any;
-      setter(value);
+      textHandlers.set(value);
+    },
+    onKeydown(e) {
+      console.log("****:e", e);
+      const { value } = e.target as any;
+      if (e.key === "ArrowDown") {
+        listHandlers.append(value);
+      }
+      if (e.key === "ArrowUp") {
+        listHandlers.prepend(value);
+      }
+      if (e.key === "2") {
+        listHandlers.insertAt(2, `Second ${value}`);
+      }
     },
   },
 });
@@ -41,20 +85,20 @@ const Input = builder({
 //   (Input as any).value = newVal;
 // });
 
-const html = createTagElement(
+const html = createTag(
   "ul",
   { a: 2 },
-  createTagElement("li", { class: "aclass" }, "uno"),
-  createTagElement("li", null, "due"),
-  createTagElement(
+  createTag("li", { class: "aclass" }, "uno"),
+  createTag("li", null, "due"),
+  createTag(
     "ul",
     null,
-    createTagElement(
+    createTag(
       "li",
       { id: "11", styles: { backgroundColor: "red" }, className: "className" },
       "due-uno",
     ),
-    createTagElement(
+    createTag(
       "li",
       {
         ariaLabel: "test",
@@ -72,8 +116,8 @@ const html = createTagElement(
       //   },
       // }),
       Input,
-      builder("span"),
-      builder({
+      textTagFactory("span"),
+      textTagFactory({
         tag: "p",
         attributes: {
           styles: {
@@ -83,6 +127,7 @@ const html = createTagElement(
           },
         },
       }),
+      LI,
     ),
   ),
 );

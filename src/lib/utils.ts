@@ -1,12 +1,12 @@
 import { RenderData, TagType } from "./types";
 
-const isPrimitiveValue = (data: any) =>
+export const isPrimitiveValue = (data: any) =>
   typeof data === "bigint" ||
   typeof data === "boolean" ||
   typeof data === "number" ||
   typeof data === "string";
 
-function isElement(obj: TagType): obj is HTMLElement {
+export function isElement(obj: TagType): obj is HTMLElement {
   try {
     //Using W3 DOM2 (works for FF, Opera and Chrome)
     return obj instanceof HTMLElement;
@@ -23,26 +23,7 @@ function isElement(obj: TagType): obj is HTMLElement {
   }
 }
 
-// const assignAttributes = (el: RenderNode, attributes: RenderAttributes) => {
-//   if (!attributes || typeof el != "object" || !el) {
-//     return;
-//   }
-//   Object.entries(attributes).forEach(([key, value]) => {
-//     if (key.startsWith("on")) {
-//       el.addEventListener(key.slice(2).toLowerCase(), (e) => {
-//         if (typeof value === "function") {
-//           value(e, el);
-//         }
-//       });
-//     } else {
-//       if (isElement(el)) {
-//         el.setAttribute(key, value as string);
-//       }
-//     }
-//   });
-// };
-
-const buildAttributes = (data: RenderData, el: TagType) => {
+export const buildAttributes = (data: RenderData, el: TagType) => {
   const { attributes } = data;
   if (attributes) {
     Object.entries(attributes).forEach(([key, value]) => {
@@ -72,4 +53,19 @@ const buildAttributes = (data: RenderData, el: TagType) => {
   }
 };
 
-export { buildAttributes, isElement, isPrimitiveValue };
+// TODO: To be replaced with library.
+export function generateUUID() { // Public Domain/MIT
+    var d = new Date().getTime();//Timestamp
+    var d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now()*1000)) || 0;//Time in microseconds since page-load or 0 if unsupported
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16;//random number between 0 and 16
+        if(d > 0){//Use timestamp until depleted
+            r = (d + r)%16 | 0;
+            d = Math.floor(d/16);
+        } else {//Use microseconds since page-load if supported
+            r = (d2 + r)%16 | 0;
+            d2 = Math.floor(d2/16);
+        }
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
