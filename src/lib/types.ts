@@ -98,8 +98,9 @@ export type TagStoreType<T> = {
   model?: string;
 };
 
+export type UpdatedFn<T> = (previousValue: T) => T;
 export type Getter<T> = () => T;
-export type Setter<T> = (value: T) => void;
+export type Setter<T> = (value: T | UpdatedFn<T>) => void;
 
 export type CreateValueResult<T> = [
   (data: BuilderArgs<T> | string) => HTMLElement | Text,

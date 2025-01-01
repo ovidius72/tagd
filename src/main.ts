@@ -1,3 +1,4 @@
+import { Counter } from "./counter.ts";
 import { createListValues } from "./lib/createListValue.ts";
 import { createTag } from "./lib/createTag.ts";
 import { createValue } from "./lib/createValue.ts";
@@ -60,7 +61,6 @@ const Input = textTagFactory({
   options: { model: "value" },
   attributes: {
     onInput(e) {
-      console.log("*****: e", e);
       const { value } = e.target as HTMLInputElement;
 
       textHandlers.set(value);
@@ -132,6 +132,7 @@ const html = createTag(
       LI,
     ),
   ),
+  Counter(),
 );
 
 createRoot("#app", html);

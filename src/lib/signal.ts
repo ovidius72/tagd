@@ -1,3 +1,5 @@
+import { UpdatedFn } from "./types";
+
 type Subscriber<T> = (value: T) => void;
 
 class Signal<T> {
@@ -12,8 +14,12 @@ class Signal<T> {
     return this.value;
   }
 
-  setValue(newValue: T) {
-    this.value = newValue;
+  setValue(newValue: T | UpdatedFn<T>) {
+    let nextValue: T | undefined;
+    if (typeof newValue === "function") {
+      nextValue = (newValue as UpdatedFn<T>)(this.value);
+    }
+    this.value = nextValue as T;
     this.emit();
   }
 

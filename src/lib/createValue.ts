@@ -10,7 +10,7 @@ import {
 import { buildAttributes, isElement } from "./utils";
 
 const createTagNodeOrText = <T>(value: T, el?: string) => {
-  if (!value) {
+  if (typeof value === "undefined" || value === null) {
     return document.createTextNode("");
   }
   if (el) {
