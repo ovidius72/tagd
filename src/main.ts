@@ -32,26 +32,26 @@ const LI = listFactory({
   attributes: {},
   itemsDefinition: {
     tag: "li",
-    afterItemCreated: (el, value, args, index) => {
+    afterItemCreated: (_el, value, args, index) => {
       console.log("****:args", args);
-      if(index < 2) {
-        return el;
-      }
-      return createTag(
+      // if(index < 2) {
+      //   return el;
+      // }
+      const tag = createTag(
         "li",
         null,
         createTag("span", null, value),
         createTag(
           "button",
           {
-            onClick(e) {
-              console.log("clicked", index);
-              listHandlers.removeNode(el);
+            onClick() {
+              listHandlers.removeNode(tag);
             },
           },
-          `Remove at ${index} value ${value}`,
+          `Remove`,
         ),
       );
+      return tag;
     },
   },
 });

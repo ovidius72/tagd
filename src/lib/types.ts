@@ -71,12 +71,19 @@ export type AfterItemCreatedHook<T extends TagValues> = (
   value: T,
   args: BuilderArgs<T>,
   index: number,
+  parentId: string,
 ) => HTMLElement;
 
+export type ValueStoreType = {
+  valueHandler: CreateValueResult<TagValues>;
+  rawValue: TagValues;
+  id: string;
+}
+export type ListItemsDefinition<T extends TagValues> = BuilderArgs<T> & {
+  afterItemCreated?: AfterItemCreatedHook<T>;
+};
 export type ListBuilderArgs<T extends TagValues> = {
-  itemsDefinition?: BuilderArgs<T> & {
-    afterItemCreated?: AfterItemCreatedHook<T>;
-  };
+  itemsDefinition?: ListItemsDefinition<T>;
 } & Omit<BuilderArgs<T>, "options">;
 
 export type BuilderArgs<T extends TagValues> = {
@@ -86,7 +93,7 @@ export type BuilderArgs<T extends TagValues> = {
 };
 
 export type TagStoreType<T extends TagValues> = {
-  el: HTMLElement;
+  el: HTMLElement | Text;
   keyMap?: (data: T) => T | string;
   model?: string;
 };

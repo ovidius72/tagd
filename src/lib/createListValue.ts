@@ -3,11 +3,12 @@ import {
   ArrayElement,
   BuilderArgs,
   CreateListValueResult,
-  CreateValueResult,
   ListBuilderArgs,
   ListDefinition,
   ListHandlers,
+  ListItemsDefinition,
   TagValues,
+  ValueStoreType,
 } from "./types";
 import { buildAttributes, generateUUID, isElement } from "./utils";
 const DEFAULT_LIST_ITEM_TAG = "li";
@@ -18,22 +19,18 @@ export const createListValues = <T extends TagValues[]>(
 ): CreateListValueResult<ArrayElement<T>> => {
   let mainTags: ListDefinition<ArrayElement<T>>[] = [];
 
-  let valueStore: Array<{
-    createdValue: CreateValueResult<TagValues>;
-    rawValue: TagValues;
-    id: string;
-  }> = (initialValue || []).map((val) => ({
+  let valueStore: Array<ValueStoreType> = (initialValue || []).map((val) => ({
     id: generateUUID(),
-    createdValue: createValue(val),
+    valueHandler: createValue(val),
     rawValue: val,
   }));
 
   const append: ListHandlers["append"] = (item) => {
-    const newValue = createValue(item);
-    const [newItemFactory] = newValue;
+    const valueHandler = createValue(item);
+    const [newItemFactory] = valueHandler;
     const id = generateUUID();
     valueStore.push({
-      createdValue: newValue,
+      valueHandler,
       rawValue: item,
       id,
     });
@@ -70,96 +67,67 @@ export const createListValues = <T extends TagValues[]>(
   };
 
   const prepend: ListHandlers["prepend"] = (item) => {
-    const newValue = createValue(item);
-    const [newItemFactory] = newValue;
+    const valueHandler = createValue(item);
     const id = generateUUID();
-    valueStore = [
-      { id, createdValue: newValue, rawValue: item },
-      ...valueStore,
-    ];
+    const newValueStore: ValueStoreType = { id, rawValue: item, valueHandler };
+    valueStore = [{ id, valueHandler, rawValue: item }, ...valueStore];
     mainTags.forEach((list) => {
-      let itemEl = newItemFactory({
-        tag: list.definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
-        attributes: { [DATA_TAGR_ID]: id },
-      });
       const { definition } = list;
-      const { itemsDefinition } = definition || {};
-      const { attributes, afterItemCreated } = itemsDefinition || {};
-      if (afterItemCreated) {
-        itemEl = afterItemCreated(
-          itemEl,
-          item as ArrayElement<T>,
-          {
-            attributes: { ...attributes, [DATA_TAGR_ID]: id },
-          },
-          0,
-        );
-      }
-      buildAttributes(
-        { attributes: { ...attributes, [DATA_TAGR_ID]: id } },
-        itemEl,
+      const itemArgs = {
+        tag: list.definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
+        attributes: { ...definition.attributes, [DATA_TAGR_ID]: id },
+      };
+      const item = _buildItem(
+        newValueStore,
+        0,
+        itemArgs,
+        definition.itemsDefinition,
       );
-      list.el.prepend(itemEl);
+      list.el.prepend(item);
     });
   };
 
   const insertAt: ListHandlers["insertAt"] = (index, item) => {
-    const newValue = createValue(item);
-    const [newItemFactory] = newValue;
+    const valueHandler = createValue(item);
     const id = generateUUID();
+    const newValueStore: ValueStoreType = { valueHandler, rawValue: item, id };
     valueStore = [
       ...valueStore.slice(0, index),
-      { createdValue: newValue, rawValue: item, id },
+      newValueStore,
       ...valueStore.slice(index + 1),
     ];
 
     mainTags.forEach((list) => {
       const {
-        definition: {
-          tag: listTag = DEFAULT_LIST_ITEM_TAG,
-          attributes: listAttributes = { [DATA_TAGR_ID]: id },
-          itemsDefinition,
-        },
+        definition: { tag: listTag = DEFAULT_LIST_ITEM_TAG, itemsDefinition },
       } = list || {};
-      const { afterItemCreated, attributes: itemAttributes } =
-        itemsDefinition || {};
 
-      let itemEl = newItemFactory({
-        tag: listTag,
-        attributes: listAttributes,
-      });
-      if (afterItemCreated) {
-        itemEl = afterItemCreated(
-          itemEl,
-          item as ArrayElement<T>,
-          {
-            attributes: { ...itemAttributes, [DATA_TAGR_ID]: id },
-          },
-          index,
-        );
-      }
-      buildAttributes(
-        {
-          attributes: {
-            ...itemAttributes,
-            [DATA_TAGR_ID]: id,
-          },
-          el: list.definition.itemsDefinition?.tag,
-        },
-        itemEl,
+      const {
+        attributes: itemAttributes,
+        options,
+        tag,
+      } = itemsDefinition || {};
+
+      const item = _buildItem(
+        newValueStore,
+        index,
+        { attributes: itemAttributes, tag: tag || listTag, options },
+        itemsDefinition,
       );
       if (list.el.children.length > 0) {
         const existingEl = list.el.children[index];
-        list.el.insertBefore(itemEl, existingEl);
+        list.el.insertBefore(item, existingEl);
       } else {
-        list.el.append(itemEl);
+        list.el.append(item);
       }
     });
   };
+
   // const update: ListHandlers["update"] = (index, item) => {
   //   items = items.with(index, item) as T;
   //   return items[index] as ArrayElement<T>;
   // };
+
   const removeAt: ListHandlers["removeAt"] = (index) => {
     mainTags.forEach((list) => {
       const node = list.el.childNodes[index];
@@ -169,18 +137,17 @@ export const createListValues = <T extends TagValues[]>(
       }
     });
   };
+
   const removeNode: ListHandlers["removeNode"] = (node) => {
-    const idAttribute = node.getAttribute(DATA_TAGR_ID);
-    if (idAttribute) {
-      mainTags.forEach((list) => {
-        const node = list.el.querySelector(
-          `[${DEFAULT_LIST_ITEM_TAG}]=${idAttribute}`,
+    const idAttribute = node.attributes.getNamedItem(DATA_TAGR_ID);
+    mainTags.forEach((list) => {
+      if (node && idAttribute) {
+        list.el.removeChild(node);
+        valueStore = valueStore.filter(
+          (value) => value.id !== idAttribute.value,
         );
-        if (node) {
-          list.el.removeChild(node);
-        }
-      });
-    }
+      }
+    });
   };
 
   const clear = () => {
@@ -221,7 +188,6 @@ export const createListValues = <T extends TagValues[]>(
       tag: itemTag = DEFAULT_LIST_ITEM_TAG,
       attributes: itemAttributes,
       options: itemOptions,
-      afterItemCreated,
     } = itemsDefinition || {};
 
     // mainTags
@@ -234,7 +200,7 @@ export const createListValues = <T extends TagValues[]>(
       el: listElement,
       definition: args,
     });
-    // itemTag
+
     if (!itemTag) {
       itemTag = "li";
     }
@@ -244,28 +210,83 @@ export const createListValues = <T extends TagValues[]>(
       attributes: itemAttributes,
       options: itemOptions,
     };
-    const children = valueStore.map(({ createdValue, id, rawValue }, index) => {
-      const [itemBuilder] = createdValue;
-      let el = itemBuilder(itemArgs as BuilderArgs<TagValues>);
-      buildAttributes(
-        { attributes: { ...itemAttributes, [DATA_TAGR_ID]: id }, el: itemTag },
-        el,
-      );
-      if (afterItemCreated) {
-        el = afterItemCreated(
-          el,
-          rawValue as ArrayElement<T>,
-          {
-            ...itemArgs,
-            attributes: { ...itemArgs.attributes, [DATA_TAGR_ID]: id },
-          },
-          index,
-        );
-      }
-      return el;
-    });
+
+    const children = _buildItems(itemArgs, itemsDefinition);
     listElement.append(...children);
     return listElement;
+  };
+
+  const _buildItem = (
+    valueStore: ValueStoreType,
+    index: number,
+    itemArgs: BuilderArgs<ArrayElement<T>>,
+    listItemsDefinition?: ListItemsDefinition<ArrayElement<T>>,
+  ) => {
+    const {
+      tag: itemTag,
+      attributes: itemAttributes,
+      options: itemOptions,
+    } = itemArgs || {};
+
+    const {
+      afterItemCreated,
+      attributes: listItemDefinitionAttributes,
+      options: listItemDefinitionOptions,
+    } = listItemsDefinition || {};
+
+    const { valueHandler, id, rawValue } = valueStore;
+    const [factory] = valueHandler;
+
+    let item = factory({
+      tag: itemTag,
+      options: {
+        ...listItemDefinitionOptions,
+        ...itemOptions,
+      },
+      attributes: {
+        ...listItemDefinitionAttributes,
+        ...listItemDefinitionAttributes,
+      },
+    } as BuilderArgs<TagValues>);
+
+    if (afterItemCreated) {
+      item = afterItemCreated(
+        item,
+        rawValue as ArrayElement<T>,
+        {
+          ...itemArgs,
+          attributes: {
+            ...listItemDefinitionAttributes,
+            ...itemArgs.attributes,
+            [DATA_TAGR_ID]: id,
+          },
+        },
+        index,
+        id,
+      );
+    }
+    buildAttributes(
+      {
+        attributes: {
+          ...listItemDefinitionAttributes,
+          ...itemAttributes,
+          [DATA_TAGR_ID]: id,
+        },
+        el: itemTag,
+      },
+      item,
+    );
+    return item;
+  };
+
+  const _buildItems = (
+    itemArgs: BuilderArgs<ArrayElement<T>>,
+    listItemsDefinition?: ListItemsDefinition<ArrayElement<T>>,
+  ) => {
+    const items = valueStore.map((valueHandler, index) => {
+      return _buildItem(valueHandler, index, itemArgs, listItemsDefinition);
+    });
+    return items;
   };
 
   const handlers: ListHandlers = {
