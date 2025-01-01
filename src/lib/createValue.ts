@@ -1,17 +1,17 @@
 import { effectCallback } from "./effect";
 import { Signal } from "./signal";
 import {
-    BuilderArgs,
-    CreateValueResult,
-    NodeTypeMap,
-    TagStoreType,
-    TagValues,
+  BuilderArgs,
+  CreateValueResult,
+  NodeTypeMap,
+  TagStoreType,
+  // TagValues,
 } from "./types";
 import { buildAttributes, isElement } from "./utils";
 
-const createTagNodeOrText = (value: TagValues, el?: string) => {
-  if(!value) {
-    return document.createTextNode("")
+const createTagNodeOrText = <T>(value: T, el?: string) => {
+  if (!value) {
+    return document.createTextNode("");
   }
   if (el) {
     return document.createElement(el);
@@ -19,9 +19,7 @@ const createTagNodeOrText = (value: TagValues, el?: string) => {
   return document.createTextNode(value?.toString());
 };
 
-export const createValue = <T extends TagValues>(
-  value: T,
-): CreateValueResult<T> => {
+export const createValue = <T>(value: T): CreateValueResult<T> => {
   const tagStore: Array<TagStoreType<T>> = [];
   const signal = new Signal<T>(value);
 
@@ -51,17 +49,17 @@ export const createValue = <T extends TagValues>(
 
   const _setNodeValue = (data: TagStoreType<T>) => {
     const { el, keyMap, model } = data || {};
-    let elValue: any = signal.getValue();
+    let elValue = signal.getValue();
     if (keyMap) {
-      elValue = keyMap(value);
+      elValue = keyMap(value) as T;
     }
     if (el.nodeType === NodeTypeMap.Text && elValue) {
       el.textContent = elValue.toString();
     } else if (el instanceof HTMLElement) {
       if (model) {
-        (el as any)[model] = elValue.toString();
+        el.setAttribute(model, elValue as string);
       }
-      el.innerHTML = elValue.toString();
+      el.innerHTML = elValue as string;
     }
   };
 
@@ -82,3 +80,4 @@ export const createValue = <T extends TagValues>(
   const handlers = { get: getter, set: setter };
   return [factory, handlers];
 };
+

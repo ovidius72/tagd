@@ -1,8 +1,8 @@
 import { Signal } from "./signal";
 
-let effectCallback: Function | null = null;
+let effectCallback: (() => void) | null = null;
 
-const createEffect = (callback: Function) => {
+const createEffect = (callback: () => void) => {
   effectCallback = callback;
   callback();
   effectCallback = null;

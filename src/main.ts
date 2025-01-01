@@ -32,7 +32,7 @@ const LI = listFactory({
   attributes: {},
   itemsDefinition: {
     tag: "li",
-    afterItemCreated: (_el, value, args, index) => {
+    afterItemCreated: (_el, value, args, _index) => {
       console.log("****:args", args);
       // if(index < 2) {
       //   return el;
@@ -60,20 +60,22 @@ const Input = textTagFactory({
   options: { model: "value" },
   attributes: {
     onInput(e) {
-      const { value } = e.target as any;
+      console.log("*****: e", e);
+      const { value } = e.target as HTMLInputElement;
+
       textHandlers.set(value);
     },
     onKeydown(e) {
       console.log("****:e", e);
-      const { value } = e.target as any;
+      const { value } = e.target as HTMLInputElement;
+      if (e.key === "2") {
+        listHandlers.insertAt(2, `Second ${value}`);
+      }
       if (e.key === "ArrowDown") {
         listHandlers.append(value);
       }
       if (e.key === "ArrowUp") {
         listHandlers.prepend(value);
-      }
-      if (e.key === "2") {
-        listHandlers.insertAt(2, `Second ${value}`);
       }
     },
   },
@@ -133,3 +135,4 @@ const html = createTag(
 );
 
 createRoot("#app", html);
+

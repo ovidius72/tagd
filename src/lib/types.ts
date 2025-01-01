@@ -1,13 +1,13 @@
 export type RenderProps = HTMLElement;
 
 export type TagType = string | Node | HTMLElement;
-export type TagValues =
-  | Record<string, unknown>
-  | string
-  | number
-  | boolean
-  | undefined
-  | null;
+// export type TagValues =
+//   | Record<string, unknown>
+//   | string
+//   | number
+//   | boolean
+//   | undefined
+//   | null;
 
 export type RenderNode =
   | Node
@@ -53,11 +53,11 @@ export enum NodeTypeMap {
   "Notation" = 12,
 }
 
-export type TagBuilderOptions<T extends TagValues> = {
+export type TagBuilderOptions<T> = {
   model?: string;
   keyMap?: (data: T) => string;
 };
-export type ListDefinition<T extends TagValues> = {
+export type ListDefinition<T> = {
   el: HTMLElement;
   definition: ListBuilderArgs<T> & {
     attributes?: RenderAttributes;
@@ -66,63 +66,64 @@ export type ListDefinition<T extends TagValues> = {
   };
 };
 
-export type AfterItemCreatedHook<T extends TagValues> = (
-  el: HTMLElement,
+export type AfterItemCreatedHook<T> = (
+  el: HTMLElement | Text,
   value: T,
   args: BuilderArgs<T>,
   index: number,
   parentId: string,
 ) => HTMLElement;
 
-export type ValueStoreType = {
-  valueHandler: CreateValueResult<TagValues>;
-  rawValue: TagValues;
+export type ValueStoreType<T> = {
+  valueHandler: CreateValueResult<T>;
+  rawValue: T;
   id: string;
-}
-export type ListItemsDefinition<T extends TagValues> = BuilderArgs<T> & {
+};
+export type ListItemsDefinition<T> = BuilderArgs<T> & {
   afterItemCreated?: AfterItemCreatedHook<T>;
 };
-export type ListBuilderArgs<T extends TagValues> = {
+export type ListBuilderArgs<T> = {
   itemsDefinition?: ListItemsDefinition<T>;
 } & Omit<BuilderArgs<T>, "options">;
 
-export type BuilderArgs<T extends TagValues> = {
+export type BuilderArgs<T> = {
   tag?: string;
   options?: TagBuilderOptions<T>;
   attributes?: RenderAttributes;
 };
 
-export type TagStoreType<T extends TagValues> = {
+export type TagStoreType<T> = {
   el: HTMLElement | Text;
-  keyMap?: (data: T) => T | string;
+  keyMap?: (data: T) => string;
   model?: string;
 };
 
-export type Getter<T extends TagValues> = () => T;
-export type Setter<T extends TagValues> = (value: T) => void;
+export type Getter<T> = () => T;
+export type Setter<T> = (value: T) => void;
 
-export type CreateValueResult<T extends TagValues> = [
-  (data: BuilderArgs<T> | string) => HTMLElement,
+export type CreateValueResult<T> = [
+  (data: BuilderArgs<T> | string) => HTMLElement | Text,
   handlers: { get: Getter<T>; set: Setter<T> },
 ];
 
-export type ListHandlers = {
+export type ListHandlers<T> = {
   // get: Getter<T>;
   // set: Setter<T>;
-  append: (item: TagValues) => void;
-  prepend: (item: TagValues) => void;
-  // update: (index: number, item: TagValues) => TagValues;
-  insertAt: (index: number, item: TagValues) => void;
+  append: (item: T) => void;
+  prepend: (item: T) => void;
+  // update: (index: number, item: T) => TagValues;
+  insertAt: (index: number, item: T) => void;
   removeAt: (index: number) => void;
   removeNode: (node: HTMLElement) => void;
   clear: () => void;
   rebuild: () => void;
 };
 
-export type CreateListValueResult<T extends TagValues> = [
+export type CreateListValueResult<T> = [
   (data: ListBuilderArgs<T> | string) => HTMLElement,
-  handlers: ListHandlers,
+  handlers: ListHandlers<T>,
 ];
 
-export type ArrayElement<ArrayType extends readonly TagValues[]> =
+export type ArrayElement<ArrayType extends readonly never[]> =
   ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
+

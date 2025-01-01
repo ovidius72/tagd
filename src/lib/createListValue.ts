@@ -1,75 +1,70 @@
 import { createValue } from "./createValue";
 import {
-  ArrayElement,
+  // ArrayElement,
   BuilderArgs,
   CreateListValueResult,
   ListBuilderArgs,
   ListDefinition,
   ListHandlers,
   ListItemsDefinition,
-  TagValues,
+  // TagValues,
   ValueStoreType,
 } from "./types";
 import { buildAttributes, generateUUID, isElement } from "./utils";
 const DEFAULT_LIST_ITEM_TAG = "li";
 const DATA_TAGR_ID = "data-tagr-id";
 
-export const createListValues = <T extends TagValues[]>(
-  initialValue?: T,
-): CreateListValueResult<ArrayElement<T>> => {
-  let mainTags: ListDefinition<ArrayElement<T>>[] = [];
+export const createListValues = <T>(
+  initialValue?: Array<T>,
+): CreateListValueResult<T> => {
+  const mainTags: ListDefinition<T>[] = [];
 
-  let valueStore: Array<ValueStoreType> = (initialValue || []).map((val) => ({
+  let valueStore = (initialValue || []).map((val) => ({
     id: generateUUID(),
     valueHandler: createValue(val),
     rawValue: val,
   }));
 
-  const append: ListHandlers["append"] = (item) => {
+  const append: ListHandlers<T>["append"] = (item) => {
     const valueHandler = createValue(item);
-    const [newItemFactory] = valueHandler;
     const id = generateUUID();
-    valueStore.push({
+    const newValueStore: ValueStoreType<T> = {
       valueHandler,
       rawValue: item,
       id,
-    });
+    };
+    valueStore.push(newValueStore);
+
     mainTags.forEach((list) => {
       const { definition } = list;
       const { itemsDefinition } = definition || {};
 
       const {
         tag: itemTag = DEFAULT_LIST_ITEM_TAG,
-        afterItemCreated,
         attributes: itemAttributes,
-        options: itemOptions,
       } = itemsDefinition || {};
 
-      let itemEl = newItemFactory(itemTag);
-      if (afterItemCreated) {
-        itemEl = afterItemCreated(
-          itemEl,
-          item as ArrayElement<T>,
-          {
-            tag: itemTag,
-            attributes: { ...itemAttributes, [DATA_TAGR_ID]: id },
-            options: itemOptions,
-          },
-          valueStore.length - 1,
-        );
-      }
-      buildAttributes(
-        { attributes: { ...itemAttributes, [DATA_TAGR_ID]: id } },
-        itemEl,
+      const item = buildItem(
+        newValueStore,
+        valueStore.length - 1,
+        {
+          tag: itemTag,
+          attributes: { ...itemAttributes, [DATA_TAGR_ID]: id },
+        },
+        definition.itemsDefinition,
       );
-      list.el.append(itemEl);
+      list.el.append(item);
     });
   };
 
-  const prepend: ListHandlers["prepend"] = (item) => {
+  const prepend: ListHandlers<T>["prepend"] = (item) => {
     const valueHandler = createValue(item);
     const id = generateUUID();
-    const newValueStore: ValueStoreType = { id, rawValue: item, valueHandler };
+    const newValueStore: ValueStoreType<T> = {
+      id,
+      rawValue: item,
+      valueHandler,
+    };
     valueStore = [{ id, valueHandler, rawValue: item }, ...valueStore];
     mainTags.forEach((list) => {
       const { definition } = list;
@@ -77,7 +72,7 @@ export const createListValues = <T extends TagValues[]>(
         tag: list.definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
         attributes: { ...definition.attributes, [DATA_TAGR_ID]: id },
       };
-      const item = _buildItem(
+      const item = buildItem(
         newValueStore,
         0,
         itemArgs,
@@ -87,10 +82,14 @@ export const createListValues = <T extends TagValues[]>(
     });
   };
 
-  const insertAt: ListHandlers["insertAt"] = (index, item) => {
+  const insertAt: ListHandlers<T>["insertAt"] = (index, item) => {
     const valueHandler = createValue(item);
     const id = generateUUID();
-    const newValueStore: ValueStoreType = { valueHandler, rawValue: item, id };
+    const newValueStore: ValueStoreType<T> = {
+      valueHandler,
+      rawValue: item,
+      id,
+    };
     valueStore = [
       ...valueStore.slice(0, index),
       newValueStore,
@@ -108,7 +107,7 @@ export const createListValues = <T extends TagValues[]>(
         tag,
       } = itemsDefinition || {};
 
-      const item = _buildItem(
+      const item = buildItem(
         newValueStore,
         index,
         { attributes: itemAttributes, tag: tag || listTag, options },
@@ -123,12 +122,12 @@ export const createListValues = <T extends TagValues[]>(
     });
   };
 
-  // const update: ListHandlers["update"] = (index, item) => {
+  // const update: ListHandlers<T>["update"] = (index, item) => {
   //   items = items.with(index, item) as T;
   //   return items[index] as ArrayElement<T>;
   // };
 
-  const removeAt: ListHandlers["removeAt"] = (index) => {
+  const removeAt: ListHandlers<T>["removeAt"] = (index) => {
     mainTags.forEach((list) => {
       const node = list.el.childNodes[index];
       if (node) {
@@ -138,7 +137,7 @@ export const createListValues = <T extends TagValues[]>(
     });
   };
 
-  const removeNode: ListHandlers["removeNode"] = (node) => {
+  const removeNode: ListHandlers<T>["removeNode"] = (node) => {
     const idAttribute = node.attributes.getNamedItem(DATA_TAGR_ID);
     mainTags.forEach((list) => {
       if (node && idAttribute) {
@@ -156,10 +155,8 @@ export const createListValues = <T extends TagValues[]>(
   // TODO: not implemented yet.
   const rebuild = () => {};
 
-  const listFactory = (
-    data: ListBuilderArgs<ArrayElement<T>> | string,
-  ): HTMLElement => {
-    let args: ListBuilderArgs<ArrayElement<T>> | undefined = undefined;
+  const listFactory = (data: ListBuilderArgs<T> | string): HTMLElement => {
+    let args: ListBuilderArgs<T> | undefined = undefined;
     if (typeof data === "string") {
       args = {
         itemsDefinition: {
@@ -184,11 +181,9 @@ export const createListValues = <T extends TagValues[]>(
       attributes: listAttributes = {},
     } = args || {};
 
-    let {
-      tag: itemTag = DEFAULT_LIST_ITEM_TAG,
-      attributes: itemAttributes,
-      options: itemOptions,
-    } = itemsDefinition || {};
+    let { tag: itemTag = DEFAULT_LIST_ITEM_TAG } = itemsDefinition || {};
+    const { attributes: itemAttributes, options: itemOptions } =
+      itemsDefinition || {};
 
     // mainTags
     const listElement =
@@ -205,22 +200,22 @@ export const createListValues = <T extends TagValues[]>(
       itemTag = "li";
     }
 
-    const itemArgs: BuilderArgs<ArrayElement<T>> = {
+    const itemArgs: BuilderArgs<T> = {
       tag: itemTag,
       attributes: itemAttributes,
       options: itemOptions,
     };
 
-    const children = _buildItems(itemArgs, itemsDefinition);
+    const children = buildItems(itemArgs, itemsDefinition);
     listElement.append(...children);
     return listElement;
   };
 
-  const _buildItem = (
-    valueStore: ValueStoreType,
+  const buildItem = (
+    valueStore: ValueStoreType<T>,
     index: number,
-    itemArgs: BuilderArgs<ArrayElement<T>>,
-    listItemsDefinition?: ListItemsDefinition<ArrayElement<T>>,
+    itemArgs: BuilderArgs<T>,
+    listItemsDefinition?: ListItemsDefinition<T>,
   ) => {
     const {
       tag: itemTag,
@@ -247,12 +242,12 @@ export const createListValues = <T extends TagValues[]>(
         ...listItemDefinitionAttributes,
         ...listItemDefinitionAttributes,
       },
-    } as BuilderArgs<TagValues>);
+    } as BuilderArgs<T>);
 
     if (afterItemCreated) {
       item = afterItemCreated(
         item,
-        rawValue as ArrayElement<T>,
+        rawValue as T,
         {
           ...itemArgs,
           attributes: {
@@ -279,17 +274,17 @@ export const createListValues = <T extends TagValues[]>(
     return item;
   };
 
-  const _buildItems = (
-    itemArgs: BuilderArgs<ArrayElement<T>>,
-    listItemsDefinition?: ListItemsDefinition<ArrayElement<T>>,
+  const buildItems = (
+    itemArgs: BuilderArgs<T>,
+    listItemsDefinition?: ListItemsDefinition<T>,
   ) => {
     const items = valueStore.map((valueHandler, index) => {
-      return _buildItem(valueHandler, index, itemArgs, listItemsDefinition);
+      return buildItem(valueHandler, index, itemArgs, listItemsDefinition);
     });
     return items;
   };
 
-  const handlers: ListHandlers = {
+  const handlers: ListHandlers<T> = {
     append,
     prepend,
     insertAt,
@@ -301,3 +296,4 @@ export const createListValues = <T extends TagValues[]>(
   };
   return [listFactory, handlers];
 };
+

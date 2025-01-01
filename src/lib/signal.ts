@@ -1,6 +1,8 @@
+type Subscriber<T> = (value: T) => void;
+
 class Signal<T> {
   value: T;
-  subscribers: Function[] = [];
+  subscribers: Subscriber<T>[] = [];
   constructor(value: T) {
     this.value = value;
     this.subscribers = [];
@@ -19,10 +21,10 @@ class Signal<T> {
     this.subscribers.forEach((subscriber) => subscriber(this.value));
   }
 
-  subscribe(callback: Function) {
+  subscribe(callback: Subscriber<T>) {
     this.subscribers.push(callback);
   }
 }
 
-
 export { Signal };
+
