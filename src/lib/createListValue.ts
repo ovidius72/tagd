@@ -1,16 +1,16 @@
 import { createValue } from "./createValue";
 import {
-  // ArrayElement,
   BuilderArgs,
   CreateListValueResult,
   ListBuilderArgs,
   ListDefinition,
   ListHandlers,
   ListItemsDefinition,
-  // TagValues,
   ValueStoreType,
 } from "./types";
+
 import { buildAttributes, generateUUID, isElement } from "./utils";
+
 const DEFAULT_LIST_ITEM_TAG = "li";
 const DATA_TAGR_ID = "data-tagr-id";
 
@@ -248,6 +248,7 @@ export const createListValues = <T>(
       item = afterItemCreated(
         item,
         rawValue as T,
+        valueHandler,
         {
           ...itemArgs,
           attributes: {

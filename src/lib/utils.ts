@@ -1,6 +1,6 @@
 import { RenderData, TagType } from "./types";
 
-export const isPrimitiveValue = (data: any) =>
+export const isPrimitiveValue = (data: unknown) =>
   typeof data === "bigint" ||
   typeof data === "boolean" ||
   typeof data === "number" ||
@@ -10,14 +10,14 @@ export function isElement(obj: TagType): obj is HTMLElement {
   try {
     //Using W3 DOM2 (works for FF, Opera and Chrome)
     return obj instanceof HTMLElement;
-  } catch (e) {
+  } catch {
     //Browsers not supporting W3 DOM2 don't have HTMLElement and
     //an exception is thrown and we end up here. Testing some
     //properties that all elements have (works on IE7)
     return (
       typeof obj === "object" &&
       obj.nodeType === 1 &&
-      typeof (obj as any).style === "object" &&
+      typeof (obj as HTMLElement).style === "object" &&
       typeof obj.ownerDocument === "object"
     );
   }
@@ -28,12 +28,14 @@ export const buildAttributes = (data: RenderData, el: TagType) => {
   if (attributes) {
     Object.entries(attributes).forEach(([key, value]) => {
       if (key === "styles") {
-        Object.entries(value as any).forEach(([propName, propValue]) => {
-          if (isElement(el) && typeof propValue === "string") {
-            el.style[propName as any] = propValue;
-            // el.style.setProperty(propName, propValue);
-          }
-        });
+        Object.entries(value as Record<string, unknown>).forEach(
+          ([propName, propValue]) => {
+            if (isElement(el) && typeof propValue === "string") {
+              el.style[propName as any] = propValue;
+              // el.style.setProperty(propName, propValue);
+            }
+          },
+        );
       }
       // this is an event
       if (key.toLowerCase().startsWith("on") && typeof el !== "string") {
@@ -54,18 +56,26 @@ export const buildAttributes = (data: RenderData, el: TagType) => {
 };
 
 // TODO: To be replaced with library.
-export function generateUUID() { // Public Domain/MIT
-    var d = new Date().getTime();//Timestamp
-    var d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now()*1000)) || 0;//Time in microseconds since page-load or 0 if unsupported
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16;//random number between 0 and 16
-        if(d > 0){//Use timestamp until depleted
-            r = (d + r)%16 | 0;
-            d = Math.floor(d/16);
-        } else {//Use microseconds since page-load if supported
-            r = (d2 + r)%16 | 0;
-            d2 = Math.floor(d2/16);
-        }
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
+export function generateUUID() {
+  // Public Domain/MIT
+  let d = new Date().getTime(); //Timestamp
+  let d2 =
+    (typeof performance !== "undefined" &&
+      performance.now &&
+      performance.now() * 1000) ||
+    0; //Time in microseconds since page-load or 0 if unsupported
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    let r = Math.random() * 16; //random number between 0 and 16
+    if (d > 0) {
+      //Use timestamp until depleted
+      r = (d + r) % 16 | 0;
+      d = Math.floor(d / 16);
+    } else {
+      //Use microseconds since page-load if supported
+      r = (d2 + r) % 16 | 0;
+      d2 = Math.floor(d2 / 16);
+    }
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }
+

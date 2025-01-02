@@ -69,6 +69,7 @@ export type ListDefinition<T> = {
 export type AfterItemCreatedHook<T> = (
   el: HTMLElement | Text,
   value: T,
+  handler: CreateValueResult<T>,
   args: BuilderArgs<T>,
   index: number,
   parentId: string,

@@ -32,16 +32,30 @@ const LI = listFactory({
   tag: "ol",
   attributes: {},
   itemsDefinition: {
-    tag: "li",
-    afterItemCreated: (_el, value, args, _index) => {
-      console.log("****:args", args);
-      // if(index < 2) {
-      //   return el;
-      // }
+    // tag: "li",
+    afterItemCreated: (_el, _value, itemValue, _args, _index) => {
+      const [itemFactory, itemHandler] = itemValue;
+      // input
+      const modifyInput = itemFactory({
+        tag: "input",
+        options: { model: "value" },
+        attributes: {
+          onInput: (e) => {
+            console.log("*****: e", e);
+            itemHandler.set((e.target as HTMLInputElement).value);
+          },
+        },
+      });
+
+      // value
+      const itemValueSpan = itemFactory("span");
+
+      // wrapper tag
       const tag = createTag(
         "li",
         null,
-        createTag("span", null, value),
+        itemValueSpan,
+        modifyInput,
         createTag(
           "button",
           {
@@ -56,6 +70,7 @@ const LI = listFactory({
     },
   },
 });
+
 const Input = textTagFactory({
   tag: "input",
   options: { model: "value" },
@@ -106,17 +121,6 @@ const html = createTag(
         ariaLabel: "test",
         className: "inner",
       },
-      // createTagElement("input", {
-      //   value: "init",
-      //   onInput(e: any, el) {
-      //     console.log("****:e", e);
-      //     if (e && e.target) {
-      //       const { value } = e.target;
-      //       console.log("****:value", value);
-      //       setter(value);
-      //     }
-      //   },
-      // }),
       Input,
       textTagFactory("span"),
       textTagFactory({

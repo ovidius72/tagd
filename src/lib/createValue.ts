@@ -5,6 +5,7 @@ import {
   CreateValueResult,
   NodeTypeMap,
   TagStoreType,
+  UpdatedFn,
   // TagValues,
 } from "./types";
 import { buildAttributes, isElement } from "./utils";
@@ -70,7 +71,7 @@ export const createValue = <T>(value: T): CreateValueResult<T> => {
     return signal.getValue();
   };
 
-  const setter = (value: T): void => {
+  const setter = (value: T | UpdatedFn<T>): void => {
     signal.setValue(value);
     tagStore.forEach((tag) => {
       _setNodeValue(tag);

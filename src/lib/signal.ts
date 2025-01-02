@@ -18,6 +18,8 @@ class Signal<T> {
     let nextValue: T | undefined;
     if (typeof newValue === "function") {
       nextValue = (newValue as UpdatedFn<T>)(this.value);
+    } else {
+      nextValue = newValue;
     }
     this.value = nextValue as T;
     this.emit();
