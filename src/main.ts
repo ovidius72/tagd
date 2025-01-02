@@ -3,46 +3,33 @@ import { createListValues } from "./lib/createListValue.ts";
 import { createTag } from "./lib/createTag.ts";
 import { createValue } from "./lib/createValue.ts";
 import { createRoot } from "./lib/dom.ts";
+import { createEffect } from "./lib/effect.ts";
 import "./style.css";
-
-// document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-//   <div>
-//     <a href="https://vite.dev" target="_blank">
-//       <img src="${viteLogo}" class="logo" alt="Vite logo" />
-//     </a>
-//     <a href="https://www.typescriptlang.org/" target="_blank">
-//       <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-//     </a>
-//     <h1>Vite + TypeScript</h1>
-//     <div class="card">
-//       <button id="counter" type="button"></button>
-//     </div>
-//     <p class="read-the-docs">
-//       Click on the Vite and TypeScript logos to learn more
-//     </p>
-//   </div>
-// `
-
-// setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
 
 const [textTagFactory, textHandlers] = createValue("Initial value new");
 const [listFactory, listHandlers] = createListValues(["a", "b"]);
 
+createEffect(() => {
+  console.log("Items in list", listHandlers.getValues().length);
+});
+
 const LI = listFactory({
   tag: "ol",
   attributes: {},
+  dynamic: true,
   itemsDefinition: {
     // tag: "li",
-    afterItemCreated: (_el, _value, itemValue, _args, _index) => {
-      const [itemFactory, itemHandler] = itemValue;
+    afterItemCreated: ({ useValue }) => {
+      const [itemFactory, itemHandler] = useValue;
+
       // input
       const modifyInput = itemFactory({
         tag: "input",
-        options: { model: "value" },
+        // options: { model: "value" },
         attributes: {
-          onInput: (e) => {
-            console.log("*****: e", e);
-            itemHandler.set((e.target as HTMLInputElement).value);
+          onKeydown: (e) => {
+            if (e.key === "Enter")
+              itemHandler.set((e.target as HTMLInputElement).value);
           },
         },
       });
@@ -133,7 +120,33 @@ const html = createTag(
           },
         },
       }),
+      createTag(
+        "button",
+        {
+          onClick: () => listHandlers.setValues((prev) => [...prev, "new"]),
+        },
+        "Add new value",
+      ),
       LI,
+      createTag(
+        "button",
+        {
+          onClick: () => {
+            listHandlers.clear();
+            console.log("****:values", listHandlers.getValues());
+          },
+        },
+        "Clear List",
+      ),
+      createTag(
+        "button",
+        {
+          onClick: () => {
+            console.log("****:values", listHandlers.getValues());
+          },
+        },
+        "Log values",
+      ),
     ),
   ),
   Counter(),

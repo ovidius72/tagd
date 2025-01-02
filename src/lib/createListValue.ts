@@ -1,4 +1,6 @@
 import { createValue } from "./createValue";
+import { effectCallback } from "./effect";
+import { Signal } from "./signal";
 import {
   BuilderArgs,
   CreateListValueResult,
@@ -19,21 +21,38 @@ export const createListValues = <T>(
 ): CreateListValueResult<T> => {
   const mainTags: ListDefinition<T>[] = [];
 
-  let valueStore = (initialValue || []).map((val) => ({
+  let valueStore: ValueStoreType<T>[] = (initialValue || []).map((val) => ({
     id: generateUUID(),
-    valueHandler: createValue(val),
-    rawValue: val,
+    useValue: createValue(val),
+    value: val,
   }));
 
-  const append: ListHandlers<T>["append"] = (item) => {
-    const valueHandler = createValue(item);
+  const valueStoreSignal = new Signal(valueStore);
+
+  const handleOnListChanged = (list: ListDefinition<T>, event: string) => {
+    // console.log("^^^^^^^^^^^^^^^^ ListChanged: ", list);
+    // console.log("*****: event", event);
+  };
+
+  const handleOnItemChanged = (
+    valueStore: ValueStoreType<T>,
+    event: string,
+  ) => {
+    // console.log("&&&&&&&&&&&&&&&&& ItemChanged", valueStore);
+    // console.log("*****: event", event);
+  };
+
+  const append: ListHandlers<T>["append"] = (value) => {
+    const useValue = createValue(value);
     const id = generateUUID();
     const newValueStore: ValueStoreType<T> = {
-      valueHandler,
-      rawValue: item,
+      useValue,
+      value,
       id,
     };
+
     valueStore.push(newValueStore);
+    valueStoreSignal.setValue(valueStore);
 
     mainTags.forEach((list) => {
       const { definition } = list;
@@ -54,18 +73,21 @@ export const createListValues = <T>(
         definition.itemsDefinition,
       );
       list.el.append(item);
+      handleOnListChanged(list, "append");
     });
   };
 
-  const prepend: ListHandlers<T>["prepend"] = (item) => {
-    const valueHandler = createValue(item);
+  const prepend: ListHandlers<T>["prepend"] = (value) => {
+    const useValue = createValue(value);
     const id = generateUUID();
     const newValueStore: ValueStoreType<T> = {
       id,
-      rawValue: item,
-      valueHandler,
+      value,
+      useValue,
     };
-    valueStore = [{ id, valueHandler, rawValue: item }, ...valueStore];
+    valueStore = [{ id, useValue, value: value }, ...valueStore];
+    valueStoreSignal.setValue(valueStore);
+
     mainTags.forEach((list) => {
       const { definition } = list;
       const itemArgs = {
@@ -79,22 +101,24 @@ export const createListValues = <T>(
         definition.itemsDefinition,
       );
       list.el.prepend(item);
+      handleOnListChanged(list, "prepend");
     });
   };
 
-  const insertAt: ListHandlers<T>["insertAt"] = (index, item) => {
-    const valueHandler = createValue(item);
+  const insertAt: ListHandlers<T>["insertAt"] = (index, value) => {
+    const useValue = createValue(value);
     const id = generateUUID();
     const newValueStore: ValueStoreType<T> = {
-      valueHandler,
-      rawValue: item,
+      useValue,
+      value,
       id,
     };
     valueStore = [
       ...valueStore.slice(0, index),
       newValueStore,
-      ...valueStore.slice(index + 1),
+      ...valueStore.slice(index),
     ];
+    valueStoreSignal.setValue(valueStore);
 
     mainTags.forEach((list) => {
       const {
@@ -116,8 +140,10 @@ export const createListValues = <T>(
       if (list.el.children.length > 0) {
         const existingEl = list.el.children[index];
         list.el.insertBefore(item, existingEl);
+        handleOnListChanged(list, "insert");
       } else {
         list.el.append(item);
+        handleOnListChanged(list, "append");
       }
     });
   };
@@ -133,6 +159,8 @@ export const createListValues = <T>(
       if (node) {
         list.el.removeChild(node);
         valueStore.splice(index, 1);
+        valueStoreSignal.setValue(valueStore);
+        handleOnListChanged(list, "removeAt");
       }
     });
   };
@@ -145,15 +173,34 @@ export const createListValues = <T>(
         valueStore = valueStore.filter(
           (value) => value.id !== idAttribute.value,
         );
+        valueStoreSignal.setValue(valueStore);
+        handleOnListChanged(list, "removeNode");
       }
     });
   };
 
   const clear = () => {
+    mainTags.forEach((list) => {
+      list.el.innerHTML = "";
+      handleOnListChanged(list, "clear");
+    });
     valueStore = [];
+    valueStoreSignal.setValue(valueStore);
   };
-  // TODO: not implemented yet.
-  const rebuild = () => {};
+
+  const rebuild = () => {
+    mainTags.forEach((list) => {
+      const { definition } = list;
+      const itemArgs = {
+        tag: definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
+        attributes: { ...definition.attributes },
+      };
+      const children = buildItems(itemArgs, definition.itemsDefinition);
+      list.el.innerHTML = "";
+      list.el.append(...children);
+      handleOnListChanged(list, "rebuild");
+    });
+  };
 
   const listFactory = (data: ListBuilderArgs<T> | string): HTMLElement => {
     let args: ListBuilderArgs<T> | undefined = undefined;
@@ -208,6 +255,7 @@ export const createListValues = <T>(
 
     const children = buildItems(itemArgs, itemsDefinition);
     listElement.append(...children);
+    handleOnListChanged({ el: listElement, definition: args }, "created");
     return listElement;
   };
 
@@ -229,8 +277,8 @@ export const createListValues = <T>(
       options: listItemDefinitionOptions,
     } = listItemsDefinition || {};
 
-    const { valueHandler, id, rawValue } = valueStore;
-    const [factory] = valueHandler;
+    const { useValue, id, value } = valueStore;
+    const [factory] = useValue;
 
     let item = factory({
       tag: itemTag,
@@ -243,23 +291,18 @@ export const createListValues = <T>(
         ...listItemDefinitionAttributes,
       },
     } as BuilderArgs<T>);
+    handleOnItemChanged(valueStore, "created");
 
     if (afterItemCreated) {
-      item = afterItemCreated(
-        item,
-        rawValue as T,
-        valueHandler,
-        {
-          ...itemArgs,
-          attributes: {
-            ...listItemDefinitionAttributes,
-            ...itemArgs.attributes,
-            [DATA_TAGR_ID]: id,
-          },
-        },
+      item = afterItemCreated({
+        element: item,
+        value,
+        useValue,
+        args: itemArgs,
         index,
-        id,
-      );
+        parentId: id,
+      });
+      handleOnItemChanged(valueStore, "hookItemCreated");
     }
     buildAttributes(
       {
@@ -272,6 +315,7 @@ export const createListValues = <T>(
       },
       item,
     );
+    handleOnItemChanged(valueStore, "attribute-assigned");
     return item;
   };
 
@@ -279,19 +323,53 @@ export const createListValues = <T>(
     itemArgs: BuilderArgs<T>,
     listItemsDefinition?: ListItemsDefinition<T>,
   ) => {
-    const items = valueStore.map((valueHandler, index) => {
+    const items = valueStoreSignal.getValue().map((valueHandler, index) => {
       return buildItem(valueHandler, index, itemArgs, listItemsDefinition);
     });
     return items;
   };
 
+  const getValues: ListHandlers<T>["getValues"] = () => {
+    if (effectCallback) {
+      valueStoreSignal.subscribe(effectCallback);
+    }
+    return valueStoreSignal.getValue().map((v) => v.value);
+  };
+
+  /*
+   * currently replace the whole list content.
+   * TODO: Find a way to reutilize existing items if any ??
+   */
+  const setValues: ListHandlers<T>["setValues"] = (values) => {
+    if (typeof values === "function") {
+      const newValues = values(valueStoreSignal.getValue().map((v) => v.value));
+      const nextValues = newValues.map((v) => ({
+        id: generateUUID(),
+        value: v,
+        useValue: createValue(v),
+      }));
+      valueStoreSignal.setValue(nextValues);
+    } else {
+      valueStoreSignal.setValue(
+        values.map((v) => ({
+          id: generateUUID(),
+          value: v,
+          useValue: createValue(v),
+        })),
+      );
+    }
+    valueStore = valueStoreSignal.getValue();
+    rebuild();
+  };
+
   const handlers: ListHandlers<T> = {
+    getValues,
+    setValues,
     append,
     prepend,
     insertAt,
     removeNode,
     removeAt,
-    // update,
     clear,
     rebuild,
   };

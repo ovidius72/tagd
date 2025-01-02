@@ -66,18 +66,22 @@ export type ListDefinition<T> = {
   };
 };
 
+export type ItemHookParams<T> = {
+  element: HTMLElement | Text;
+  value: T;
+  useValue: CreateValueResult<T>;
+  args: BuilderArgs<T>;
+  index: number;
+  parentId: string;
+};
+
 export type AfterItemCreatedHook<T> = (
-  el: HTMLElement | Text,
-  value: T,
-  handler: CreateValueResult<T>,
-  args: BuilderArgs<T>,
-  index: number,
-  parentId: string,
+  params: ItemHookParams<T>,
 ) => HTMLElement;
 
 export type ValueStoreType<T> = {
-  valueHandler: CreateValueResult<T>;
-  rawValue: T;
+  useValue: CreateValueResult<T>;
+  value: T;
   id: string;
 };
 export type ListItemsDefinition<T> = BuilderArgs<T> & {
@@ -85,6 +89,8 @@ export type ListItemsDefinition<T> = BuilderArgs<T> & {
 };
 export type ListBuilderArgs<T> = {
   itemsDefinition?: ListItemsDefinition<T>;
+  /** - Cause the list to be re-rendered on change */
+  dynamic?: boolean;
 } & Omit<BuilderArgs<T>, "options">;
 
 export type BuilderArgs<T> = {
@@ -109,11 +115,10 @@ export type CreateValueResult<T> = [
 ];
 
 export type ListHandlers<T> = {
-  // get: Getter<T>;
-  // set: Setter<T>;
+  getValues: Getter<T[]>;
+  setValues: Setter<T[]>;
   append: (item: T) => void;
   prepend: (item: T) => void;
-  // update: (index: number, item: T) => TagValues;
   insertAt: (index: number, item: T) => void;
   removeAt: (index: number) => void;
   removeNode: (node: HTMLElement) => void;
