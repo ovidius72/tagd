@@ -30,16 +30,24 @@ export const createListValues = <T>(
   const valueStoreSignal = new Signal(valueStore);
 
   const handleOnListChanged = (list: ListDefinition<T>, event: string) => {
-    // console.log("^^^^^^^^^^^^^^^^ ListChanged: ", list);
-    // console.log("*****: event", event);
+    const {
+      definition: { debug },
+    } = list;
+    if (debug) {
+      console.log("^^^^^^^^^^^^^^^^ ListChanged: ", list);
+      console.log("*****: event", event);
+    }
   };
 
   const handleOnItemChanged = (
     valueStore: ValueStoreType<T>,
     event: string,
+    list?: ListDefinition<T>,
   ) => {
-    // console.log("&&&&&&&&&&&&&&&&& ItemChanged", valueStore);
-    // console.log("*****: event", event);
+    if (list && list.definition?.debug) {
+      console.log("&&&&&&&&&&&&&&&&& ItemChanged", valueStore);
+      console.log("*****: event", event);
+    }
   };
 
   const append: ListHandlers<T>["append"] = (value) => {
@@ -70,7 +78,7 @@ export const createListValues = <T>(
           tag: itemTag,
           attributes: { ...itemAttributes, [DATA_TAGR_ID]: id },
         },
-        definition.itemsDefinition,
+        list,
       );
       list.el.append(item);
       handleOnListChanged(list, "append");
@@ -94,12 +102,7 @@ export const createListValues = <T>(
         tag: list.definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
         attributes: { ...definition.attributes, [DATA_TAGR_ID]: id },
       };
-      const item = buildItem(
-        newValueStore,
-        0,
-        itemArgs,
-        definition.itemsDefinition,
-      );
+      const item = buildItem(newValueStore, 0, itemArgs, list);
       list.el.prepend(item);
       handleOnListChanged(list, "prepend");
     });
@@ -135,7 +138,7 @@ export const createListValues = <T>(
         newValueStore,
         index,
         { attributes: itemAttributes, tag: tag || listTag, options },
-        itemsDefinition,
+        list,
       );
       if (list.el.children.length > 0) {
         const existingEl = list.el.children[index];
@@ -195,7 +198,7 @@ export const createListValues = <T>(
         tag: definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
         attributes: { ...definition.attributes },
       };
-      const children = buildItems(itemArgs, definition.itemsDefinition);
+      const children = buildItems(itemArgs, list);
       list.el.innerHTML = "";
       list.el.append(...children);
       handleOnListChanged(list, "rebuild");
@@ -238,10 +241,11 @@ export const createListValues = <T>(
 
     buildAttributes({ attributes: listAttributes }, listElement);
 
-    mainTags.push({
+    const listDefinition: ListDefinition<T> = {
       el: listElement,
       definition: args,
-    });
+    };
+    mainTags.push(listDefinition);
 
     if (!itemTag) {
       itemTag = "li";
@@ -253,7 +257,7 @@ export const createListValues = <T>(
       options: itemOptions,
     };
 
-    const children = buildItems(itemArgs, itemsDefinition);
+    const children = buildItems(itemArgs, listDefinition);
     listElement.append(...children);
     handleOnListChanged({ el: listElement, definition: args }, "created");
     return listElement;
@@ -263,7 +267,7 @@ export const createListValues = <T>(
     valueStore: ValueStoreType<T>,
     index: number,
     itemArgs: BuilderArgs<T>,
-    listItemsDefinition?: ListItemsDefinition<T>,
+    listDefinition?: ListDefinition<T>,
   ) => {
     const {
       tag: itemTag,
@@ -271,11 +275,14 @@ export const createListValues = <T>(
       options: itemOptions,
     } = itemArgs || {};
 
+    const { definition } = listDefinition || {};
+    const { itemsDefinition } = definition || {};
+
     const {
       afterItemCreated,
       attributes: listItemDefinitionAttributes,
       options: listItemDefinitionOptions,
-    } = listItemsDefinition || {};
+    } = itemsDefinition || {};
 
     const { useValue, id, value } = valueStore;
     const [factory] = useValue;
@@ -291,7 +298,7 @@ export const createListValues = <T>(
         ...listItemDefinitionAttributes,
       },
     } as BuilderArgs<T>);
-    handleOnItemChanged(valueStore, "created");
+    handleOnItemChanged(valueStore, "created", listDefinition);
 
     if (afterItemCreated) {
       item = afterItemCreated({
@@ -302,7 +309,7 @@ export const createListValues = <T>(
         index,
         parentId: id,
       });
-      handleOnItemChanged(valueStore, "hookItemCreated");
+      handleOnItemChanged(valueStore, "hookItemCreated", listDefinition);
     }
     buildAttributes(
       {
@@ -315,16 +322,16 @@ export const createListValues = <T>(
       },
       item,
     );
-    handleOnItemChanged(valueStore, "attribute-assigned");
+    handleOnItemChanged(valueStore, "attribute-assigned", listDefinition);
     return item;
   };
 
   const buildItems = (
     itemArgs: BuilderArgs<T>,
-    listItemsDefinition?: ListItemsDefinition<T>,
+    listDefinition?: ListDefinition<T>,
   ) => {
     const items = valueStoreSignal.getValue().map((valueHandler, index) => {
-      return buildItem(valueHandler, index, itemArgs, listItemsDefinition);
+      return buildItem(valueHandler, index, itemArgs, listDefinition);
     });
     return items;
   };

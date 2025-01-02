@@ -8,15 +8,15 @@ import "./style.css";
 
 const [textTagFactory, textHandlers] = createValue("Initial value new");
 const [listFactory, listHandlers] = createListValues(["a", "b"]);
+const [itemCountFactory, itemCountHandlers] = createValue(
+  listHandlers.getValues().length,
+);
 
-createEffect(() => {
-  console.log("Items in list", listHandlers.getValues().length);
-});
-
-const LI = listFactory({
+const List = listFactory({
   tag: "ol",
   attributes: {},
   dynamic: true,
+  debug: true,
   itemsDefinition: {
     // tag: "li",
     afterItemCreated: ({ useValue }) => {
@@ -58,6 +58,18 @@ const LI = listFactory({
   },
 });
 
+createEffect(() => {
+  const itemsCount = listHandlers.getValues().length;
+  itemCountHandlers.set(itemsCount);
+  List.style.backgroundColor = "transparent";
+  if (itemsCount > 5) {
+    List.style.backgroundColor = "red";
+  }
+  if (itemsCount > 10) {
+    List.style.backgroundColor = "green";
+  }
+});
+
 const Input = textTagFactory({
   tag: "input",
   options: { model: "value" },
@@ -68,10 +80,18 @@ const Input = textTagFactory({
       textHandlers.set(value);
     },
     onKeydown(e) {
-      console.log("****:e", e);
       const { value } = e.target as HTMLInputElement;
-      if (e.key === "2") {
+      if (e.key === "-") {
+        listHandlers.removeAt(0);
+        e.stopPropagation();
+        e.preventDefault();
+        return false;
+      }
+      if (e.key === "+") {
         listHandlers.insertAt(2, `Second ${value}`);
+        e.stopPropagation();
+        e.preventDefault();
+        return false;
       }
       if (e.key === "ArrowDown") {
         listHandlers.append(value);
@@ -120,6 +140,7 @@ const html = createTag(
           },
         },
       }),
+      createTag("p", null, "Count is: ", itemCountFactory("span")),
       createTag(
         "button",
         {
@@ -127,7 +148,7 @@ const html = createTag(
         },
         "Add new value",
       ),
-      LI,
+      List,
       createTag(
         "button",
         {

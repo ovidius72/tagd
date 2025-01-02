@@ -91,6 +91,8 @@ export type ListBuilderArgs<T> = {
   itemsDefinition?: ListItemsDefinition<T>;
   /** - Cause the list to be re-rendered on change */
   dynamic?: boolean;
+  /** Print additional information to the console */
+  debug?: boolean;
 } & Omit<BuilderArgs<T>, "options">;
 
 export type BuilderArgs<T> = {
