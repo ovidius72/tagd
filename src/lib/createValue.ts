@@ -1,6 +1,8 @@
 import { effectCallback } from "./effect";
 import { Signal } from "./signal";
 import {
+  AttributeSetterOptions,
+  AttributeType,
   BuilderArgs,
   CreateValueResult,
   NodeTypeMap,
@@ -23,9 +25,10 @@ const createTagNodeOrText = <T>(value: T, el?: string) => {
 export const createValue = <T>(value: T): CreateValueResult<T> => {
   const tagStore: Array<TagStoreType<T>> = [];
   const signal = new Signal<T>(value);
+  let isContainer = false;
 
-  /*
-   *Builder function
+  /**
+   * Builder function
    */
   const factory = (data?: BuilderArgs<T> | string) => {
     let args: BuilderArgs<T> | undefined = undefined;
@@ -37,7 +40,7 @@ export const createValue = <T>(value: T): CreateValueResult<T> => {
     const { tag, options = {}, attributes } = args || {};
     const { keyMap, model } = options;
     const el = tag && isElement(tag) ? tag : createTagNodeOrText(value, tag);
-    buildAttributes({ attributes }, el);
+    buildAttributes({ attributes: attributes as AttributeType<unknown> }, el);
     const elMap: TagStoreType<T> = {
       el,
       keyMap,
@@ -52,15 +55,30 @@ export const createValue = <T>(value: T): CreateValueResult<T> => {
     const { el, keyMap, model } = data || {};
     let elValue = signal.getValue();
     if (keyMap) {
-      elValue = keyMap(value) as T;
+      if (typeof keyMap === "function") {
+        elValue = keyMap(value) as T;
+      } else {
+        elValue = elValue[keyMap as never];
+      }
     }
     if (el.nodeType === NodeTypeMap.Text && elValue) {
       el.textContent = elValue.toString();
     } else if (el instanceof HTMLElement) {
       if (model) {
+        if (model === "checked" && elValue === true) {
+          el.setAttribute("checked", "checked");
+          return;
+        }
+        if (model === "checked" && elValue === false) {
+          el.removeAttribute("checked");
+          return;
+        }
         el.setAttribute(model, elValue as string);
+        return;
       }
-      el.innerHTML = elValue as string;
+      if (!isContainer) {
+        el.innerHTML = elValue as string;
+      }
     }
   };
 
@@ -78,7 +96,25 @@ export const createValue = <T>(value: T): CreateValueResult<T> => {
     });
   };
 
-  const handlers = { get: getter, set: setter };
+  const setAttributes = (
+    attributes: AttributeType<T>,
+    options?: AttributeSetterOptions,
+  ) => {
+    const { skipAttachEvents = false } = options || {};
+    tagStore.forEach(({ el }) => {
+      buildAttributes(
+        { attributes: attributes as AttributeType<unknown> },
+        el,
+        skipAttachEvents,
+      );
+    });
+  };
+
+  const setAsContainer = (value: boolean) => {
+    isContainer = value;
+  };
+
+  const handlers = { get: getter, set: setter, setAttributes, setAsContainer };
   return [factory, handlers];
 };
 

@@ -1,13 +1,19 @@
+import { createTag } from "./createTag";
 import { createValue } from "./createValue";
 import { effectCallback } from "./effect";
 import { Signal } from "./signal";
 import {
+  AttributeType,
   BuilderArgs,
   CreateListValueResult,
+  ItemAttributeType,
+  ListAttributeType,
   ListBuilderArgs,
   ListDefinition,
   ListHandlers,
-  ListItemsDefinition,
+  PrimitiveValues,
+  SlotDefinition,
+  SlotsStoreType,
   ValueStoreType,
 } from "./types";
 
@@ -20,6 +26,8 @@ export const createListValues = <T>(
   initialValue?: Array<T>,
 ): CreateListValueResult<T> => {
   const mainTags: ListDefinition<T>[] = [];
+  const itemsArgs: BuilderArgs<T>[] = [];
+  const slotArgs: Array<BuilderArgs<T>[]> = [[]];
 
   let valueStore: ValueStoreType<T>[] = (initialValue || []).map((val) => ({
     id: generateUUID(),
@@ -28,6 +36,30 @@ export const createListValues = <T>(
   }));
 
   const valueStoreSignal = new Signal(valueStore);
+  const slotStoreSignal = new Signal<SlotsStoreType<PrimitiveValues | T>[]>(
+    [] as SlotsStoreType<PrimitiveValues | T>[],
+  );
+
+  const getListComputedAttributes = <T>(
+    attributes: ListAttributeType<T>,
+    values: T[],
+  ) => {
+    const computedAttributes =
+      typeof attributes === "function" ? attributes(values) : attributes;
+    return computedAttributes;
+  };
+
+  const getComputedAttributes = (
+    attributes: AttributeType<T> | ItemAttributeType<T>,
+    values: T,
+    index?: number,
+  ) => {
+    const computedAttributes =
+      typeof attributes === "function"
+        ? attributes(values, index ?? -1)
+        : attributes;
+    return computedAttributes;
+  };
 
   const handleOnListChanged = (list: ListDefinition<T>, event: string) => {
     const {
@@ -70,13 +102,14 @@ export const createListValues = <T>(
         tag: itemTag = DEFAULT_LIST_ITEM_TAG,
         attributes: itemAttributes,
       } = itemsDefinition || {};
+      const computedAttributes = getComputedAttributes(itemAttributes, value);
 
       const item = buildItem(
         newValueStore,
         valueStore.length - 1,
         {
           tag: itemTag,
-          attributes: { ...itemAttributes, [DATA_TAGR_ID]: id },
+          attributes: { ...computedAttributes, [DATA_TAGR_ID]: id },
         },
         list,
       );
@@ -98,9 +131,14 @@ export const createListValues = <T>(
 
     mainTags.forEach((list) => {
       const { definition } = list;
+      const computedAttributes = getComputedAttributes(
+        definition.attributes,
+        value,
+        0,
+      );
       const itemArgs = {
         tag: list.definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
-        attributes: { ...definition.attributes, [DATA_TAGR_ID]: id },
+        attributes: { ...computedAttributes, [DATA_TAGR_ID]: id },
       };
       const item = buildItem(newValueStore, 0, itemArgs, list);
       list.el.prepend(item);
@@ -134,10 +172,15 @@ export const createListValues = <T>(
         tag,
       } = itemsDefinition || {};
 
+      const computedAttributes = getComputedAttributes(
+        itemAttributes,
+        value,
+        index,
+      );
       const item = buildItem(
         newValueStore,
         index,
-        { attributes: itemAttributes, tag: tag || listTag, options },
+        { attributes: computedAttributes, tag: tag || listTag, options },
         list,
       );
       if (list.el.children.length > 0) {
@@ -191,12 +234,16 @@ export const createListValues = <T>(
     valueStoreSignal.setValue(valueStore);
   };
 
-  const rebuild = () => {
+  const rebuild = (onlyDynamics = false) => {
     mainTags.forEach((list) => {
       const { definition } = list;
+      const { dynamic } = definition || {};
+      if (onlyDynamics && !dynamic) {
+        return;
+      }
       const itemArgs = {
         tag: definition.itemsDefinition?.tag || DEFAULT_LIST_ITEM_TAG,
-        attributes: { ...definition.attributes },
+        attributes: { ...definition?.itemsDefinition?.attributes },
       };
       const children = buildItems(itemArgs, list);
       list.el.innerHTML = "";
@@ -220,7 +267,7 @@ export const createListValues = <T>(
     } else {
       args = {
         ...data,
-        attributes: { ...data.attributes },
+        attributes: data.attributes,
         itemsDefinition: { tag: "li", ...data.itemsDefinition },
       };
     }
@@ -231,15 +278,20 @@ export const createListValues = <T>(
       attributes: listAttributes = {},
     } = args || {};
 
-    let { tag: itemTag = DEFAULT_LIST_ITEM_TAG } = itemsDefinition || {};
-    const { attributes: itemAttributes, options: itemOptions } =
+    let { tag: listItemTag = DEFAULT_LIST_ITEM_TAG } = itemsDefinition || {};
+    const { attributes: listItemAttributes, options: itemOptions } =
       itemsDefinition || {};
 
     // mainTags
     const listElement =
       listTag && isElement(listTag) ? listTag : document.createElement(listTag);
 
-    buildAttributes({ attributes: listAttributes }, listElement);
+    // Items Container Attributes (generally UL/OL)
+    const computedListAttributes = getListComputedAttributes(
+      listAttributes as ListAttributeType<T>,
+      valueStore.map((v) => v.value),
+    );
+    buildAttributes({ attributes: computedListAttributes }, listElement);
 
     const listDefinition: ListDefinition<T> = {
       el: listElement,
@@ -247,17 +299,18 @@ export const createListValues = <T>(
     };
     mainTags.push(listDefinition);
 
-    if (!itemTag) {
-      itemTag = "li";
+    if (!listItemTag) {
+      listItemTag = "li";
     }
 
-    const itemArgs: BuilderArgs<T> = {
-      tag: itemTag,
-      attributes: itemAttributes,
+    // List Item arguments
+    const listItemArgs: BuilderArgs<T> = {
+      tag: listItemTag,
+      attributes: listItemAttributes,
       options: itemOptions,
     };
 
-    const children = buildItems(itemArgs, listDefinition);
+    const children = buildItems(listItemArgs, listDefinition);
     listElement.append(...children);
     handleOnListChanged({ el: listElement, definition: args }, "created");
     return listElement;
@@ -282,10 +335,24 @@ export const createListValues = <T>(
       afterItemCreated,
       attributes: listItemDefinitionAttributes,
       options: listItemDefinitionOptions,
+      slots,
     } = itemsDefinition || {};
 
     const { useValue, id, value } = valueStore;
-    const [factory] = useValue;
+    const [factory, handler] = useValue;
+    handler.setAsContainer(true);
+    const listComputedAttributes = getComputedAttributes(
+      listItemDefinitionAttributes,
+      value,
+      index,
+    );
+    const itemComputedAttributes = getComputedAttributes(
+      itemAttributes,
+      value,
+      index,
+    );
+
+    itemsArgs.push(itemsDefinition as BuilderArgs<T>);
 
     let item = factory({
       tag: itemTag,
@@ -294,8 +361,8 @@ export const createListValues = <T>(
         ...itemOptions,
       },
       attributes: {
-        ...listItemDefinitionAttributes,
-        ...listItemDefinitionAttributes,
+        ...listComputedAttributes,
+        ...itemComputedAttributes,
       },
     } as BuilderArgs<T>);
     handleOnItemChanged(valueStore, "created", listDefinition);
@@ -311,17 +378,94 @@ export const createListValues = <T>(
       });
       handleOnItemChanged(valueStore, "hookItemCreated", listDefinition);
     }
+    let innerElements: Array<HTMLElement | Text> = [];
+    if (slots) {
+      const slotsDefinitions = slots({
+        value,
+        index,
+        element: item,
+        useValue,
+        parentId: id,
+        args: itemArgs,
+      });
+
+      const slotId = generateUUID();
+
+      innerElements = slotsDefinitions.map((slot) => {
+        const { model, fieldMap, attributes, name, tag } = slot;
+
+        let keyMap: T | PrimitiveValues = value;
+        if (typeof fieldMap === "function") {
+          keyMap = fieldMap(value as T, index);
+        } else if (fieldMap) {
+          keyMap = value[fieldMap as never];
+        }
+
+        const slotUseValue = createValue(keyMap);
+        slotStoreSignal.setValue((values) => [
+          ...values,
+          {
+            useValue: slotUseValue,
+            definition: slot as SlotDefinition<T | PrimitiveValues>,
+            value: keyMap,
+            id: slotId,
+            parentId: id,
+          },
+        ]);
+
+        const [slotFactory] = slotUseValue;
+
+        if (!slotArgs[index]) {
+          slotArgs[index] = [];
+        }
+        slotArgs[index].push({ attributes: attributes as AttributeType<T> });
+        const slotComputedAttributes = getComputedAttributes(
+          attributes,
+          value,
+          index,
+        );
+        const slotTag = slotFactory({
+          tag,
+          options: { model },
+          attributes: { ...slotComputedAttributes, "data-slot-name": name },
+        });
+
+        return slotTag;
+      });
+    }
+    const computedAttributes = getComputedAttributes(
+      itemAttributes,
+      value,
+      index,
+    );
+
     buildAttributes(
       {
         attributes: {
-          ...listItemDefinitionAttributes,
-          ...itemAttributes,
+          ...computedAttributes,
           [DATA_TAGR_ID]: id,
         },
         el: itemTag,
       },
       item,
     );
+    if (innerElements.length > 0 && isElement(item)) {
+      item = factory({
+        tag: itemTag,
+        options: {
+          ...listItemDefinitionOptions,
+          ...itemOptions,
+        },
+        attributes: {
+          ...listComputedAttributes,
+          ...itemComputedAttributes,
+          [DATA_TAGR_ID]: id,
+        },
+      } as BuilderArgs<T>);
+      if (isElement(item)) {
+        item.append(...innerElements);
+      }
+    }
     handleOnItemChanged(valueStore, "attribute-assigned", listDefinition);
     return item;
   };
@@ -357,21 +501,85 @@ export const createListValues = <T>(
       }));
       valueStoreSignal.setValue(nextValues);
     } else {
-      valueStoreSignal.setValue(
-        values.map((v) => ({
-          id: generateUUID(),
-          value: v,
-          useValue: createValue(v),
-        })),
-      );
+      const nextValues = values.map((v) => ({
+        id: generateUUID(),
+        value: v,
+        useValue: createValue(v),
+      }));
+      valueStoreSignal.setValue(nextValues);
     }
     valueStore = valueStoreSignal.getValue();
-    rebuild();
+    rebuild(true);
+  };
+
+  const getItemValue: ListHandlers<T>["getItemValue"] = (index) => {
+    return valueStore[index].value;
+  };
+
+  const setItemValue: ListHandlers<T>["setItemValue"] = (index, value) => {
+    const [, handler] = valueStore[index].useValue;
+    valueStore[index].value = value as T;
+    const parentId = valueStore[index].id;
+
+    const slotStore = slotStoreSignal
+      ?.getValue()
+      .filter((v) => v.parentId === parentId);
+
+    const slotAttributes = slotArgs[index];
+    slotStore.forEach((store, slotIndex) => {
+      // notify the the slots that have changed inside the current changed item
+      const { useValue, definition } = store;
+      const { fieldMap } = definition;
+      let nextValue =
+        typeof fieldMap === "function"
+          ? fieldMap(value as never, index)
+          : value;
+      if (typeof fieldMap === "string") {
+        nextValue = value[fieldMap as never];
+      }
+      const [_, slotHandler] = useValue;
+      const prevValue = slotHandler.get();
+      if (prevValue !== nextValue) {
+        slotHandler.set(nextValue as T);
+      }
+      // rebuiod slot attributes
+      const slotComputedAttributes = getComputedAttributes(
+        slotAttributes[slotIndex].attributes,
+        value as T,
+        index,
+      );
+      slotHandler.setAttributes(slotComputedAttributes, {
+        skipAttachEvents: true,
+      });
+    });
+    // updated with the new value
+    valueStoreSignal.setValue(valueStore);
+
+    // notify the main value signal of the current changed item
+    handler.set(value);
+
+    // rebuild item attributes
+    const itemAttributes = getComputedAttributes(
+      itemsArgs[index].attributes,
+      value as T,
+      index,
+    );
+    handler.setAttributes(itemAttributes, { skipAttachEvents: true });
+
+    mainTags.forEach((list) => {
+      const listAttributes = getListComputedAttributes(
+        list.definition.attributes,
+        valueStore.map((v) => v.value),
+      );
+      buildAttributes({ attributes: listAttributes }, list.el, true);
+    });
   };
 
   const handlers: ListHandlers<T> = {
     getValues,
+    getItemValue,
     setValues,
+    setItemValue,
     append,
     prepend,
     insertAt,

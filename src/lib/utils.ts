@@ -23,7 +23,11 @@ export function isElement(obj: TagType): obj is HTMLElement {
   }
 }
 
-export const buildAttributes = (data: RenderData, el: TagType) => {
+export const buildAttributes = (
+  data: RenderData<unknown>,
+  el: TagType,
+  skipAttachEvents = false,
+) => {
   const { attributes } = data;
   if (attributes) {
     Object.entries(attributes).forEach(([key, value]) => {
@@ -31,14 +35,18 @@ export const buildAttributes = (data: RenderData, el: TagType) => {
         Object.entries(value as Record<string, unknown>).forEach(
           ([propName, propValue]) => {
             if (isElement(el) && typeof propValue === "string") {
-              el.style[propName as any] = propValue;
+              el.style[propName as never] = propValue;
               // el.style.setProperty(propName, propValue);
             }
           },
         );
       }
       // this is an event
-      if (key.toLowerCase().startsWith("on") && typeof el !== "string") {
+      if (
+        !skipAttachEvents &&
+        key.toLowerCase().startsWith("on") &&
+        typeof el !== "string"
+      ) {
         el.addEventListener(key.slice(2).toLowerCase(), (e) => {
           (value as Function)(e, el);
         });

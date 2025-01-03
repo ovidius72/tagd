@@ -1,4 +1,3 @@
-import { createValue } from "./createValue";
 import { Signal } from "./signal";
 
 let effectCallback: (() => void) | null = null;
